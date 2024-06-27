@@ -1,81 +1,104 @@
 import cv2
 import numpy as np
+import mediapipe as mp
 
+# Set the frame width and height
 frameWidth = 640
 frameHeight = 480
-""" Output Window Dimensions"""
+
+# Initialize webcam capture
 cap = cv2.VideoCapture(0)
-""" Input from webcam """
 cap.set(3, frameWidth)
-cap.set(3, frameHeight)
+cap.set(4, frameHeight)
 
-myColor = [[5, 107, 0, 19, 255, 255], [133, 56, 0, 159, 156, 255], [57, 76, 0, 100, 255, 255]]
-""" My marker Colors 
- User can add more Values as per need"""
+# Initialize MediaPipe Hands
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(max_num_hands=1)
+mp_drawing = mp.solutions.drawing_utils
 
-myColorValues = [[51, 153, 255], [255, 0, 255], [0, 255, 0]]
-""" Color values of the markers in BGR 
-   User can add values as per need these color are printed on the output screen"""
+# Define possible drawing colors in BGR
+drawingColors = [
+    [51, 153, 255],  # Light blue
+    [255, 0, 255],   # Pink
+    [0, 255, 0],     # Green
+    [255, 255, 0],   # Cyan
+    [255, 0, 0]      # Blue
+]
+currentColorIndex = 0
+drawingColor = drawingColors[currentColorIndex]
 
-myPoints = []  # [x, y, colorid]
+# Initialize list to store drawing points
+myPoints = []  # [x, y, colorId]
 
-""" This function identifies the marker color
-    and displays a circle on the tip of the marker for user assistance"""
-
-
-def findColor(img, myColor, myColorValues):
-    imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    count = 0
-    newPoints = []
-
-    # For each of the color a mask is detected and contour is created for each of it
-    for color in myColor:
-        lower = np.array(color[0:3])
-        upper = np.array(color[3:6])
-        mask = cv2.inRange(imgHSV, lower, upper)
-        x, y = getContours(mask)
-        cv2.circle(imgResult, (x, y), 10, myColorValues[count], cv2.FILLED) # draws a circle on the tip of the pen
-        if x != 0 and y != 0:
-            newPoints.append([x, y, count])
-        count += 1;       # for giving the right value of color in myColorValues
-        # cv2.imshow(str(color[0]), mask)
-    return newPoints
-
-
-""" This function identifies and draws the contour of the object detected """
-
-
-def getContours(img):
-    contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    x, y, w, h = 0, 0, 0, 0;  # if area < 500 then function returns 0
-    for cnt in contours:
-        area = cv2.contourArea(cnt)  # if the area is bigger than 500px it draws contour on the image
-        if area > 500:
-            cv2.drawContours(imgResult, cnt, -1, (255, 0, 0), 3)
-            peri = cv2.arcLength(cnt, True)
-            approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
-            x, y, w, h = cv2.boundingRect(approx)
-    return x + w // 2, y            # returns the value of the tip of the pen, if area < 500 then it returns 0
-
-
-def AirDraw(myPoints, myColorValues):
+# Function to draw on the canvas
+def AirDraw(myPoints, drawingColors):
     for point in myPoints:
-        cv2.circle(imgResult, (point[0], point[1]), 10, myColorValues[point[2]], cv2.FILLED)
+        cv2.circle(imgResult, (point[0], point[1]), 10, drawingColors[point[2]], cv2.FILLED)
 
+# Function to check if all fingers are up
+def fingersUp(hand_landmarks):
+    finger_tips_ids = [mp_hands.HandLandmark.THUMB_TIP, mp_hands.HandLandmark.INDEX_FINGER_TIP, 
+                       mp_hands.HandLandmark.MIDDLE_FINGER_TIP, mp_hands.HandLandmark.RING_FINGER_TIP, 
+                       mp_hands.HandLandmark.PINKY_TIP]
+    for i in finger_tips_ids:
+        if hand_landmarks.landmark[i].y > hand_landmarks.landmark[i - 2].y:
+            return False
+    return True
 
+# Function to check if index and middle fingers are up
+def indexAndMiddleUp(hand_landmarks):
+    index_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y
+    index_pip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].y
+    middle_tip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_TIP].y
+    middle_pip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_PIP].y
+    
+    return index_tip < index_pip and middle_tip < middle_pip
+
+# Function to delete points within the hand area
+def erasePoints(myPoints, hand_landmarks, h, w):
+    x_min = min([lm.x for lm in hand_landmarks.landmark]) * w
+    x_max = max([lm.x for lm in hand_landmarks.landmark]) * w
+    y_min = min([lm.y for lm in hand_landmarks.landmark]) * h
+    y_max = max([lm.y for lm in hand_landmarks.landmark]) * h
+    
+    new_points = []
+    for point in myPoints:
+        if not (x_min < point[0] < x_max and y_min < point[1] < y_max):
+            new_points.append(point)
+    return new_points
+
+# Main loop
 while True:
-    success, img = cap.read()  # Reads Video from the webcam
-    imgResult = img.copy()  # Final image on which all the results are displayed
-    newPoints = findColor(img, myColor, myColorValues)  # These 3 values are passed in the function
+    success, img = cap.read()
+    if not success:
+        break
 
-    if len(newPoints) != 0:
-        for newP in newPoints:
-            myPoints.append(newP)  # new points are added to the list
+    imgResult = img.copy()
+    imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = hands.process(imgRGB)
 
-    """ Appends newly discovered points on the output Screen """
+    if results.multi_hand_landmarks:
+        for handLms in results.multi_hand_landmarks:
+            mp_drawing.draw_landmarks(imgResult, handLms, mp_hands.HAND_CONNECTIONS)
+            index_finger_tip = handLms.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+            h, w, c = imgResult.shape
+            cx, cy = int(index_finger_tip.x * w), int(index_finger_tip.y * h)
+            
+            if fingersUp(handLms):
+                myPoints = erasePoints(myPoints, handLms, h, w)
+            elif indexAndMiddleUp(handLms):
+                currentColorIndex = (currentColorIndex + 1) % len(drawingColors)
+                drawingColor = drawingColors[currentColorIndex]
+            else:
+                myPoints.append([cx, cy, currentColorIndex])
+
     if len(myPoints) != 0:
-        AirDraw(myPoints, myColorValues)
+        AirDraw(myPoints, drawingColors)
 
     cv2.imshow("Result", imgResult)
+
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+
+cap.release()
+cv2.destroyAllWindows()
