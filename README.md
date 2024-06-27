@@ -36,3 +36,39 @@ Make sure you have Python 3.7 or higher installed. You'll also need the followin
    ```sh
    git clone https://github.com/yourusername/air-drawing.git
    cd air-drawing
+
+2. **Install the required packages**:
+
+    Make sure you have Python installed. Then, install the dependencies using:
+
+    ```sh
+    pip install -r requirements.txt
+    ```
+
+## Usage
+
+Run the application with:
+
+```sh
+python air_drawing.py
+```
+
+## How It Works
+
+1. **Hand Detection**: The application uses MediaPipe to detect and track your hand in real-time.
+2. **Finger State Detection**: The application checks the state of your fingers to determine actions:
+    - If all five fingers are up, it erases points within the area of your hand.
+    - If the index and middle fingers are up, it changes the drawing color.
+    - Otherwise, it draws using the index finger.
+3. **Drawing and Erasing**: Points are drawn or erased based on the detected finger states and positions.
+
+## Contributing
+
+We welcome contributions to enhance this project! To contribute, follow these steps:
+
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature-branch`).
+3. Commit your changes (`git commit -m 'Add some feature'`).
+4. Push to the branch (`git push origin feature-branch`).
+5. Open a Pull Request.
+
