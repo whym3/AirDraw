@@ -34,8 +34,7 @@ Make sure you have Python 3.7 or higher installed. You'll also need the followin
 1. **Clone the Repository**
 
    ```sh
-   git clone https://github.com/yourusername/air-drawing.git
-   cd air-drawing
+   https://github.com/whym3/AirDraw.git
 
 2. **Install the required packages**:
 
@@ -50,7 +49,7 @@ Make sure you have Python 3.7 or higher installed. You'll also need the followin
 Run the application with:
 
 ```sh
-python air_drawing.py
+python AirDraw.py
 ```
 
 ## How It Works
